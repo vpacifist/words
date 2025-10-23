@@ -24,5 +24,22 @@ def home():
 def get_words():
     return jsonify(load_data())
 
+@app.route("/api/add_word", methods=["POST"])
+def add_word():
+    data = load_data()
+    new_word = request.get_json()
+
+    new_word["id"] = len(data) + 1
+    new_word["next_de_ru"] = datetime.now().isoformat()
+    new_word["next_ru_de"] = datetime.now().isoformat()
+    new_word["interval_de_ru"] = 0
+    new_word["interval_ru_de"] = 0
+    new_word["correct_de_ru"] = 0
+    new_word["correct_ru_de"] = 0
+
+    data.append(new_word)
+    save_data(data)
+    return jsonify({"status": "ok", "added": new_word})
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

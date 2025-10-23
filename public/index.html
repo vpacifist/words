@@ -5,6 +5,14 @@
   <title>Немецкие слова</title>
 </head>
 <body>
+  <h2>Добавить слово</h2>
+  <form id="addForm">
+    <input name="de" placeholder="Немецкое слово" required>
+    <input name="ru" placeholder="Перевод" required>
+    <button type="submit">Добавить</button>
+  </form>
+  <hr>
+
   <h1>Список слов</h1>
   <ul id="words"></ul>
 
@@ -19,6 +27,24 @@
           list.appendChild(li);
         });
       });
+
+    document.getElementById("addForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const body = {
+        de: form.de.value,
+        ru: form.ru.value
+      };
+      const res = await fetch("/api/add_word", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      alert("Добавлено: " + data.added.de + " — " + data.added.ru);
+      form.reset();
+    });
+    
   </script>
 </body>
 </html>
