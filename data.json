@@ -1,0 +1,13 @@
+[
+  {
+    "id": 1,
+    "de": "das Haus",
+    "ru": "дом",
+    "next_de_ru": "2025-10-24T12:00:00",
+    "next_ru_de": "2025-10-24T12:00:00",
+    "interval_de_ru": 0,
+    "interval_ru_de": 0,
+    "correct_de_ru": 0,
+    "correct_ru_de": 0
+  }
+]

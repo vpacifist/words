@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Немецкие слова</title>
+</head>
+<body>
+  <h1>Список слов</h1>
+  <ul id="words"></ul>
+
+  <script>
+    fetch('/api/words')
+      .then(r => r.json())
+      .then(data => {
+        const list = document.getElementById('words');
+        data.forEach(w => {
+          const li = document.createElement('li');
+          li.textContent = `${w.de} — ${w.ru}`;
+          list.appendChild(li);
+        });
+      });
+  </script>
+</body>
+</html>
