@@ -21,6 +21,7 @@
   <div id="train">
     <p id="question">Нажми «Начать тренировку»</p>
     <input id="answer" placeholder="Перевод" style="display:none;">
+    <p id="feedback" style="font-weight:bold;"></p>
     <button id="start">Начать тренировку</button>
   </div>
 
@@ -87,8 +88,11 @@
         const correct = reverse
           ? user === current.de.toLowerCase()
           : user === current.ru.toLowerCase();
-        alert(correct ? '✅ Верно!' :
-          `❌ ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`);
+        const feedback = document.getElementById('feedback');
+        feedback.textContent = correct
+          ? `✅ Верно: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`
+          : `❌ Ошибка: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`;
+        feedback.style.color = correct ? "green" : "red";
         fetch("/api/result", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
