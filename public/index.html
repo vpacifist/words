@@ -66,21 +66,33 @@
 
     startBtn.onclick = async () => {
       if (!words.length) await loadWords();
-      let current = words[Math.floor(Math.random() * words.length)];
-      q.textContent = `Переведи: ${current.de}`;
-      a.style.display = 'inline';
-      a.focus();
+      let current, reverse;
+
+      function nextWord() {
+        current = words[Math.floor(Math.random() * words.length)];
+        reverse = Math.random() < 0.5;
+        q.textContent = reverse
+          ? `Переведи: ${current.ru}`
+          : `Переведи: ${current.de}`;
+        a.value = '';
+        a.style.display = 'inline';
+        a.focus();
+      }
+
+      nextWord();
       startBtn.textContent = 'Проверить';
 
       startBtn.onclick = () => {
-        const correct = a.value.trim().toLowerCase() === current.ru.toLowerCase();
-        alert(correct ? '✅ Верно!' : `❌ ${current.de} — ${current.ru}`);
-        a.value = '';
-        current = words[Math.floor(Math.random() * words.length)];
-        q.textContent = `Переведи: ${current.de}`;
-        a.focus();
+        const user = a.value.trim().toLowerCase();
+        const correct = reverse
+          ? user === current.de.toLowerCase()
+          : user === current.ru.toLowerCase();
+        alert(correct ? '✅ Верно!' :
+          `❌ ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`);
+        nextWord();
       };
     };
+
 
   </script>
 </body>
