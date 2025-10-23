@@ -16,6 +16,15 @@
   <h1>Список слов</h1>
   <ul id="words"></ul>
 
+  <hr>
+  <h2>Тренировка</h2>
+  <div id="train">
+    <p id="question">Нажми «Начать тренировку»</p>
+    <input id="answer" placeholder="Перевод" style="display:none;">
+    <button id="start">Начать тренировку</button>
+  </div>
+
+
   <script>
     fetch('/api/words')
       .then(r => r.json())
@@ -44,7 +53,35 @@
       alert("Добавлено: " + data.added.de + " — " + data.added.ru);
       form.reset();
     });
-    
+
+    const q = document.getElementById('question');
+    const a = document.getElementById('answer');
+    const startBtn = document.getElementById('start');
+    let words = [];
+
+    async function loadWords() {
+      const res = await fetch('/api/words');
+      words = await res.json();
+    }
+
+    startBtn.onclick = async () => {
+      if (!words.length) await loadWords();
+      let current = words[Math.floor(Math.random() * words.length)];
+      q.textContent = `Переведи: ${current.de}`;
+      a.style.display = 'inline';
+      a.focus();
+      startBtn.textContent = 'Проверить';
+
+      startBtn.onclick = () => {
+        const correct = a.value.trim().toLowerCase() === current.ru.toLowerCase();
+        alert(correct ? '✅ Верно!' : `❌ ${current.de} — ${current.ru}`);
+        a.value = '';
+        current = words[Math.floor(Math.random() * words.length)];
+        q.textContent = `Переведи: ${current.de}`;
+        a.focus();
+      };
+    };
+
   </script>
 </body>
 </html>
