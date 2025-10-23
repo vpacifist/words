@@ -8,7 +8,7 @@
     "interval_de_ru": 0,
     "interval_ru_de": 0,
     "correct_de_ru": 0,
-    "correct_ru_de": 0
+    "correct_ru_de": 2
   },
   {
     "de": "der Hund",
@@ -18,7 +18,18 @@
     "next_ru_de": "2025-10-23T23:28:47.269848",
     "interval_de_ru": 0,
     "interval_ru_de": 0,
+    "correct_de_ru": 2,
+    "correct_ru_de": 1
+  },
+  {
+    "de": "singen",
+    "ru": "петь",
+    "id": 3,
+    "next_de_ru": "2025-10-23T23:42:25.182021",
+    "next_ru_de": "2025-10-23T23:42:25.182036",
+    "interval_de_ru": 0,
+    "interval_ru_de": 0,
     "correct_de_ru": 0,
-    "correct_ru_de": 0
+    "correct_ru_de": 2
   }
 ]

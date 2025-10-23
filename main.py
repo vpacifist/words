@@ -41,5 +41,22 @@ def add_word():
     save_data(data)
     return jsonify({"status": "ok", "added": new_word})
 
+@app.route("/api/result", methods=["POST"])
+def save_result():
+    data = load_data()
+    result = request.get_json()
+    word_id = result["id"]
+    correct = result["correct"]
+    reverse = result["reverse"]
+
+    for w in data:
+        if w["id"] == word_id:
+            key = "correct_ru_de" if reverse else "correct_de_ru"
+            w[key] += 1 if correct else 0
+            save_data(data)
+            return jsonify({"status": "ok", "updated": w})
+
+    return jsonify({"status": "error", "message": "word not found"}), 404
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

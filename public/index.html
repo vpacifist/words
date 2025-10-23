@@ -89,6 +89,11 @@
           : user === current.ru.toLowerCase();
         alert(correct ? '✅ Верно!' :
           `❌ ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`);
+        fetch("/api/result", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: current.id, correct, reverse })
+        });
         nextWord();
       };
     };
