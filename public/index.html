@@ -98,6 +98,12 @@
       };
     };
 
+    a.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        startBtn.click();
+      }
+    });
 
   </script>
 </body>
