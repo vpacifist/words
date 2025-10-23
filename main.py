@@ -1,6 +1,6 @@
 from flask import Flask, jsonify, send_from_directory, request
 import json, os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 DATA_FILE = "data.json"
 
@@ -53,6 +53,21 @@ def save_result():
         if w["id"] == word_id:
             key = "correct_ru_de" if reverse else "correct_de_ru"
             w[key] += 1 if correct else 0
+
+            intervals = [10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]  # часы
+
+            key_int = "interval_ru_de" if reverse else "interval_de_ru"
+            key_next = "next_ru_de" if reverse else "next_de_ru"
+
+            if correct:
+                current = w[key_int]
+                w[key_int] = min(current + 1, len(intervals) - 1)
+            else:
+                w[key_int] = 0
+
+            hours = intervals[w[key_int]]
+            w[key_next] = (datetime.now() + timedelta(hours=hours)).isoformat()
+
             save_data(data)
             return jsonify({"status": "ok", "updated": w})
 

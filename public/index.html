@@ -22,6 +22,7 @@
     <p id="question">Нажми «Начать тренировку»</p>
     <input id="answer" placeholder="Перевод" style="display:none;">
     <p id="feedback" style="font-weight:bold;"></p>
+    <p id="interval" style="font-size:0.9em;color:gray;"></p>
     <button id="start">Начать тренировку</button>
   </div>
 
@@ -89,15 +90,35 @@
           ? user === current.de.toLowerCase()
           : user === current.ru.toLowerCase();
         const feedback = document.getElementById('feedback');
+
         feedback.textContent = correct
           ? `✅ Верно: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`
           : `❌ Ошибка: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`;
+        const intElem = document.getElementById('interval');
+        const key = reverse ? "interval_ru_de" : "interval_de_ru";
+        intElem.textContent = "Текущий интервал: " + current[key];
+
         feedback.style.color = correct ? "green" : "red";
+
         fetch("/api/result", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: current.id, correct, reverse })
-        });
+        })
+          .then(r => r.json())
+          .then(res => {
+            const w = res.updated;
+            const key = reverse ? "interval_ru_de" : "interval_de_ru";
+            const intervals = [10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520];
+            const hours = intervals[w[key]];
+            let text = "";
+
+            if (hours < 1) text = `${Math.round(hours * 60)} минут`;
+            else if (hours < 24) text = `${hours} часов`;
+            else text = `${Math.round(hours / 24)} дней`;
+
+            intElem.textContent = `Следующая встреча этого слова через ${text}.`;
+          });
         nextWord();
       };
     };
