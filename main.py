@@ -73,5 +73,18 @@ def save_result():
 
     return jsonify({"status": "error", "message": "word not found"}), 404
 
+@app.route("/api/reset", methods=["POST"])
+def reset_stats():
+    data = load_data()
+    for w in data:
+        w["interval_de_ru"] = 0
+        w["interval_ru_de"] = 0
+        w["correct_de_ru"] = 0
+        w["correct_ru_de"] = 0
+        w["next_de_ru"] = datetime.now().isoformat()
+        w["next_ru_de"] = datetime.now().isoformat()
+    save_data(data)
+    return jsonify({"status": "ok"})
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

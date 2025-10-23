@@ -1,135 +1,205 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <title>Немецкие слова</title>
+  <meta charset="UTF-8" />
+  <title>Words — тренажёр</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, sans-serif; line-height: 1.4; max-width: 820px; margin: 24px auto; padding: 0 16px; }
+    h1,h2 { margin: 16px 0 8px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; }
+    #feedback { font-weight: 600; margin: 8px 0 4px; }
+    #interval { color: #666; margin: 0 0 8px; }
+    input[type="text"]{ padding: 6px 8px; }
+    button{ padding: 6px 10px; cursor:pointer; }
+  </style>
 </head>
 <body>
-  <h2>Добавить слово</h2>
+
+  <h1>Добавить слово</h1>
   <form id="addForm">
-    <input name="de" placeholder="Немецкое слово" required>
-    <input name="ru" placeholder="Перевод" required>
+    <input type="text" name="de" placeholder="Немецкое слово" required />
+    <input type="text" name="ru" placeholder="Перевод" required />
     <button type="submit">Добавить</button>
   </form>
-  <hr>
 
   <h1>Список слов</h1>
-  <ul id="words"></ul>
+  <ul id="wordList"></ul>
 
-  <hr>
-  <h2>Тренировка</h2>
+  <h1>Тренировка</h1>
   <div id="train">
     <p id="question">Нажми «Начать тренировку»</p>
-    <input id="answer" placeholder="Перевод" style="display:none;">
-    <p id="feedback" style="font-weight:bold;"></p>
-    <p id="interval" style="font-size:0.9em;color:gray;"></p>
+    <input id="answer" placeholder="Перевод" style="display:none;" />
+    <p id="feedback"></p>
+    <p id="interval"></p>
     <button id="start">Начать тренировку</button>
   </div>
 
+  <hr />
+
+  <h1>Текущие слова</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>DE</th><th>RU</th><th>DE→RU</th><th>RU→DE</th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  <p><button id="reset">Сбросить статистику</button></p>
 
   <script>
-    fetch('/api/words')
-      .then(r => r.json())
-      .then(data => {
-        const list = document.getElementById('words');
-        data.forEach(w => {
-          const li = document.createElement('li');
-          li.textContent = `${w.de} — ${w.ru}`;
-          list.appendChild(li);
-        });
-      });
+    // ---------- helpers ----------
+    const intervalsHours = [10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520];
+    function humanInterval(i){
+      const h = intervalsHours[i] ?? 0;
+      if (h < 1)  return `${Math.round(h*60)} мин`;
+      if (h < 24) return `${h} ч`;
+      return `${Math.round(h/24)} дн`;
+    }
 
-    document.getElementById("addForm").addEventListener("submit", async (e) => {
+    // ---------- state ----------
+    let words = [];
+    let current, reverse;
+
+    // ---------- data fetchers ----------
+    async function loadWords(){
+      const r = await fetch('/api/words');
+      words = await r.json();
+    }
+
+    async function updateTable(){
+      const r = await fetch('/api/words');
+      const data = await r.json();
+      words = data; // синхронизируем кэш
+      const body = document.getElementById('tableBody');
+      body.innerHTML = '';
+      data.forEach(w => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${w.de}</td>
+          <td>${w.ru}</td>
+          <td>${w.interval_de_ru} (${humanInterval(w.interval_de_ru)})</td>
+          <td>${w.interval_ru_de} (${humanInterval(w.interval_ru_de)})</td>
+        `;
+        body.appendChild(row);
+      });
+      renderWordList();
+    }
+
+    function renderWordList(){
+      const ul = document.getElementById('wordList');
+      ul.innerHTML = '';
+      words.forEach(w => {
+        const li = document.createElement('li');
+        li.textContent = `${w.de} — ${w.ru}`;
+        ul.appendChild(li);
+      });
+    }
+
+    // ---------- add word form ----------
+    document.getElementById('addForm').addEventListener('submit', async (e)=>{
       e.preventDefault();
-      const form = e.target;
-      const body = {
-        de: form.de.value,
-        ru: form.ru.value
-      };
-      const res = await fetch("/api/add_word", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const f = e.target;
+      const body = { de: f.de.value.trim(), ru: f.ru.value.trim() };
+      if (!body.de || !body.ru) return;
+      await fetch('/api/add_word', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
         body: JSON.stringify(body)
       });
-      const data = await res.json();
-      alert("Добавлено: " + data.added.de + " — " + data.added.ru);
-      form.reset();
+      f.reset();
+      await updateTable();
     });
 
+    // ---------- training ----------
     const q = document.getElementById('question');
     const a = document.getElementById('answer');
     const startBtn = document.getElementById('start');
-    let words = [];
+    const feedback = document.getElementById('feedback');
+    const intElem = document.getElementById('interval');
 
-    async function loadWords() {
-      const res = await fetch('/api/words');
-      words = await res.json();
+    function pickWord(){
+      current = words[Math.floor(Math.random()*words.length)];
+      reverse = Math.random() < 0.5;
+      q.textContent = reverse ? `Переведи: ${current.ru}` : `Переведи: ${current.de}`;
+      a.style.display = 'inline';
+      a.value = '';
+      a.focus();
     }
 
-    startBtn.onclick = async () => {
-      if (!words.length) await loadWords();
-      let current, reverse;
+    async function processAnswer(){
+      const user = a.value.trim().toLowerCase();
+      const correct = reverse ? user === current.de.toLowerCase()
+                              : user === current.ru.toLowerCase();
 
-      function nextWord() {
-        current = words[Math.floor(Math.random() * words.length)];
-        reverse = Math.random() < 0.5;
-        q.textContent = reverse
-          ? `Переведи: ${current.ru}`
-          : `Переведи: ${current.de}`;
-        a.value = '';
-        a.style.display = 'inline';
-        a.focus();
+      feedback.textContent = correct
+        ? `✅ Верно: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`
+        : `❌ Ошибка: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`;
+      feedback.style.color = correct ? 'green' : 'red';
+
+      startBtn.disabled = true;
+
+      const resp = await fetch('/api/result', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ id: current.id, correct, reverse })
+      });
+      const data = await resp.json();
+      const w = data.updated;
+
+      const key = reverse ? 'interval_ru_de' : 'interval_de_ru';
+      const h = intervalsHours[w[key]];
+      const text = (h < 1) ? `${Math.round(h*60)} минут`
+                 : (h < 24) ? `${h} часов`
+                 : `${Math.round(h/24)} дней`;
+      intElem.textContent = `Следующая встреча этого слова через ${text}.`;
+
+      await updateTable();
+
+      startBtn.disabled = false;
+      startBtn.textContent = 'Следующее слово';
+    }
+
+    async function controller(){
+      if (!words.length) await loadWords();
+
+      if (startBtn.textContent === 'Начать тренировку' || startBtn.textContent === 'Следующее слово'){
+        startBtn.textContent = 'Проверить';
+        feedback.textContent = '';
+        intElem.textContent = '';
+        pickWord();
+        return;
       }
 
-      nextWord();
-      startBtn.textContent = 'Проверить';
+      if (startBtn.textContent === 'Проверить'){
+        await processAnswer();
+        return;
+      }
+    }
 
-      startBtn.onclick = () => {
-        const user = a.value.trim().toLowerCase();
-        const correct = reverse
-          ? user === current.de.toLowerCase()
-          : user === current.ru.toLowerCase();
-        const feedback = document.getElementById('feedback');
+    startBtn.addEventListener('click', controller);
 
-        feedback.textContent = correct
-          ? `✅ Верно: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`
-          : `❌ Ошибка: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`;
-        const intElem = document.getElementById('interval');
-        const key = reverse ? "interval_ru_de" : "interval_de_ru";
-        intElem.textContent = "Текущий интервал: " + current[key];
-
-        feedback.style.color = correct ? "green" : "red";
-
-        fetch("/api/result", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: current.id, correct, reverse })
-        })
-          .then(r => r.json())
-          .then(res => {
-            const w = res.updated;
-            const key = reverse ? "interval_ru_de" : "interval_de_ru";
-            const intervals = [10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520];
-            const hours = intervals[w[key]];
-            let text = "";
-
-            if (hours < 1) text = `${Math.round(hours * 60)} минут`;
-            else if (hours < 24) text = `${hours} часов`;
-            else text = `${Math.round(hours / 24)} дней`;
-
-            intElem.textContent = `Следующая встреча этого слова через ${text}.`;
-          });
-        nextWord();
-      };
-    };
-
-    a.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
+    // Enter = клик по кнопке, но только если не ждём сервер
+    a.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter' && !startBtn.disabled){
         e.preventDefault();
-        startBtn.click();
+        controller();
       }
     });
 
+    // ---------- reset ----------
+    document.getElementById('reset').addEventListener('click', async ()=>{
+      if (!confirm('Сбросить всю статистику?')) return;
+      await fetch('/api/reset', { method: 'POST' });
+      feedback.textContent = '';
+      intElem.textContent = '';
+      await updateTable();
+    });
+
+    // первый рендер таблицы/списка
+    updateTable();
   </script>
 </body>
 </html>
