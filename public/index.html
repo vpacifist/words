@@ -24,6 +24,14 @@
     <button type="submit">Добавить</button>
   </form>
 
+<p>
+  <label>
+    <input type="checkbox" id="fastMode">
+    Fast mode ×30
+  </label>
+</p>
+
+
   <h1>Тренировка</h1>
   <div id="train">
     <p id="question">Нажми «Начать тренировку»</p>
@@ -54,11 +62,14 @@
     let pauseTimer = null;
     let intervalsHours = [];
     fetch('/api/intervals').then(r=>r.json()).then(arr => intervalsHours = arr);
+
     function humanInterval(i){
       const h = intervalsHours[i] ?? 0;
-      if (h < 1)  return `${Math.round(h*60)} мин`;
-      if (h < 24) return `${h} ч`;
-      return `${Math.round(h/24)} дн`;
+      const factor = isFast() ? 1/60 : 1;
+      const adjH = h * factor;
+      if (adjH < 1)  return `${Math.round(adjH*60)} мин`;
+      if (adjH < 24) return `${adjH} ч`;
+      return `${Math.round(adjH/24)} дн`;
     }
 
     // ---------- state ----------
@@ -183,7 +194,7 @@
 
       startBtn.disabled = true;
 
-      const resp = await fetch('/api/result', {
+      const resp = await fetch(`/api/result?fast=${isFast() ? 1 : 0}`, {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({ id: current.id, correct, reverse })
@@ -241,6 +252,15 @@
       intElem.textContent = '';
       await updateTable();
     });
+
+    // ---------- fast mode ----------
+    const fastBox = document.getElementById('fastMode');
+    fastBox.checked = localStorage.getItem('fastMode') === 'true';
+    fastBox.addEventListener('change', () => {
+      localStorage.setItem('fastMode', fastBox.checked);
+      log('Fast mode:', fastBox.checked);
+    });
+    function isFast(){ return fastBox.checked; }
 
     // первый рендер таблицы/списка
     updateTable();

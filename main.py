@@ -3,7 +3,7 @@ import json, os
 from datetime import datetime, timedelta
 
 DATA_FILE = "data.json"
-INTERVALS = [0, 1/60, 10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]
+INTERVALS = [0, 10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]
 
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -65,6 +65,8 @@ def save_result():
                 w[key_int] = 0
 
             hours = INTERVALS[w[key_int]]
+            if request.args.get("fast") == "1":
+                hours = hours / 30 if hours else 0
             w[key_next] = (datetime.now() + timedelta(hours=hours)).isoformat()
 
             save_data(data)
