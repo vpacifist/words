@@ -48,7 +48,8 @@
 
   <script>
     // ---------- helpers ----------
-    const intervalsHours = [10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520];
+    let intervalsHours = [];
+    fetch('/api/intervals').then(r=>r.json()).then(arr => intervalsHours = arr);
     function humanInterval(i){
       const h = intervalsHours[i] ?? 0;
       if (h < 1)  return `${Math.round(h*60)} мин`;
@@ -107,11 +108,27 @@
     const intElem = document.getElementById('interval');
 
     function pickWord(){
-      current = words[Math.floor(Math.random()*words.length)];
-      reverse = Math.random() < 0.5;
+      const now = new Date();
+      const cards = [];
+      for (const w of words){
+        if (new Date(w.next_de_ru) < now) cards.push({ w, reverse:false }); // DE→RU
+        if (new Date(w.next_ru_de) < now) cards.push({ w, reverse:true  }); // RU→DE
+      }
+
+      if (!cards.length){
+        q.textContent = "Все слова на паузе, попробуй позже.";
+        a.style.display = "none";
+        startBtn.textContent = "Начать тренировку";
+        return;
+      }
+
+      const pick = cards[Math.floor(Math.random()*cards.length)];
+      current = pick.w;
+      reverse = pick.reverse;
+
       q.textContent = reverse ? `Переведи: ${current.ru}` : `Переведи: ${current.de}`;
-      a.style.display = 'inline';
-      a.value = '';
+      a.style.display = "inline";
+      a.value = "";
       a.focus();
     }
 

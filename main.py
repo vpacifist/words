@@ -3,6 +3,7 @@ import json, os
 from datetime import datetime, timedelta
 
 DATA_FILE = "data.json"
+INTERVALS = [0, 10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]
 
 def load_data():
     if not os.path.exists(DATA_FILE):
@@ -54,18 +55,16 @@ def save_result():
             key = "correct_ru_de" if reverse else "correct_de_ru"
             w[key] += 1 if correct else 0
 
-            intervals = [10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]  # часы
-
             key_int = "interval_ru_de" if reverse else "interval_de_ru"
             key_next = "next_ru_de" if reverse else "next_de_ru"
 
             if correct:
                 current = w[key_int]
-                w[key_int] = min(current + 1, len(intervals) - 1)
+                w[key_int] = min(current + 1, len(INTERVALS) - 1)
             else:
                 w[key_int] = 0
 
-            hours = intervals[w[key_int]]
+            hours = INTERVALS[w[key_int]]
             w[key_next] = (datetime.now() + timedelta(hours=hours)).isoformat()
 
             save_data(data)
@@ -85,6 +84,10 @@ def reset_stats():
         w["next_ru_de"] = datetime.now().isoformat()
     save_data(data)
     return jsonify({"status": "ok"})
+
+@app.route("/api/intervals")
+def get_intervals():
+    return jsonify(INTERVALS)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
