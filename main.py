@@ -3,7 +3,7 @@ import json, os
 from datetime import datetime, timedelta
 
 DATA_FILE = "data.json"
-INTERVALS = [0, 10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]
+INTERVALS = [0, 1/60, 10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]
 
 def load_data():
     if not os.path.exists(DATA_FILE):

@@ -48,6 +48,10 @@
 
   <script>
     // ---------- helpers ----------
+    const DEBUG = true;
+    const log = (...a) => DEBUG && console.debug('[WORDS]', ...a);
+    let mode = 'idle'; // 'ask' | 'check' | 'next'
+    let pauseTimer = null;
     let intervalsHours = [];
     fetch('/api/intervals').then(r=>r.json()).then(arr => intervalsHours = arr);
     function humanInterval(i){
@@ -108,6 +112,8 @@
     const intElem = document.getElementById('interval');
 
     function pickWord(){
+      log('pick:start');
+      if (pauseTimer){ clearInterval(pauseTimer); pauseTimer = null; }
       startBtn.style.display = "inline";
       const now = new Date();
       const cards = [];
@@ -115,24 +121,39 @@
         if (new Date(w.next_de_ru) < now) cards.push({ w, reverse:false }); // DE→RU
         if (new Date(w.next_ru_de) < now) cards.push({ w, reverse:true  }); // RU→DE
       }
+      log('pick:cards', cards.length);
 
-      if (!cards.length) {
-        const nextTimes = words.map(w => Math.min(new Date(w.next_de_ru), new Date(w.next_ru_de))).sort((a,b)=>a-b);
+      if (!cards.length){
+        const nextTimes = words
+          .map(w => Math.min(new Date(w.next_de_ru), new Date(w.next_ru_de)))
+          .filter(t => t > new Date())
+          .sort((a,b)=>a-b);
         const next = nextTimes[0];
-        function updateTimer(){
-          const diff = Math.max(0, next - new Date());
-          const min = Math.floor(diff / 60000);
-          const sec = Math.floor((diff % 60000) / 1000);
-          q.textContent = `Все слова на паузе. Следующее слово через ${min} мин ${sec} сек.`;
+        log('pick:pause', { hasNext: !!next, next });
+        if (!next){
+          q.textContent = "Все слова на паузе. Ожидание новых слов…";
+          a.style.display = "none";
+          startBtn.style.display = "none";
+          return;
         }
-        updateTimer();
-        const t = setInterval(()=>{
-          updateTimer();
-          if (next <= new Date()){
-            clearInterval(t);
+
+        function tick(){
+          const diff = next - new Date();
+          if (diff <= 0){
+            log('tick:zero -> autostart');
+            clearInterval(pauseTimer); pauseTimer = null;
+            q.textContent = "Время истекло, загружаем слова...";
+            startBtn.textContent = 'Следующее слово'; // сброс кнопки
             loadWords().then(()=>controller());
+            return;
           }
-        },1000);
+          const m = Math.floor(diff/60000);
+          const s = Math.floor(diff/1000) % 60;
+          q.textContent = `Все слова на паузе. Следующее слово через ${m} мин ${s} сек.`;
+        }
+        tick();
+        pauseTimer = setInterval(tick, 1000);
+
         a.style.display = "none";
         startBtn.style.display = "none";
         return;
@@ -141,6 +162,7 @@
       const pick = cards[Math.floor(Math.random()*cards.length)];
       current = pick.w;
       reverse = pick.reverse;
+      log('pick:show', { id: current.id, word: current.de, reverse });
 
       q.textContent = reverse ? `Переведи: ${current.ru}` : `Переведи: ${current.de}`;
       a.style.display = "inline";
@@ -152,6 +174,7 @@
       const user = a.value.trim().toLowerCase();
       const correct = reverse ? user === current.de.toLowerCase()
                               : user === current.ru.toLowerCase();
+      log('answer', { id: current.id, reverse, user, correct });
 
       feedback.textContent = correct
         ? `✅ Верно: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`
@@ -176,12 +199,14 @@
       intElem.textContent = `Следующая встреча этого слова через ${text}.`;
 
       await updateTable();
+      log('answer:updated');
 
       startBtn.disabled = false;
       startBtn.textContent = 'Следующее слово';
     }
 
     async function controller(){
+      log('controller', { mode, btn: startBtn.textContent, words: words.length });
       if (!words.length) await loadWords();
 
       if (startBtn.textContent === 'Начать тренировку' || startBtn.textContent === 'Следующее слово'){
