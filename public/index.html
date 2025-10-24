@@ -116,7 +116,13 @@
       }
 
       if (!cards.length){
-        q.textContent = "Все слова на паузе, попробуй позже.";
+        const nextTimes = words
+          .map(w => Math.min(new Date(w.next_de_ru), new Date(w.next_ru_de)))
+          .sort((a,b) => a - b);
+        const next = nextTimes[0];
+        const diffMin = Math.round((next - new Date()) / 60000);
+        const text = diffMin > 0 ? `Следующее слово через ${diffMin} мин.` : '';
+        q.textContent = `Все слова на паузе. ${text}`;
         a.style.display = "none";
         startBtn.textContent = "Начать тренировку";
         return;

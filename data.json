@@ -3,44 +3,44 @@
     "id": 1,
     "de": "das Haus",
     "ru": "дом",
-    "next_de_ru": "2025-10-24T11:50:53.919522",
-    "next_ru_de": "2025-10-24T11:50:34.109302",
-    "interval_de_ru": 1,
-    "interval_ru_de": 1,
-    "correct_de_ru": 1,
-    "correct_ru_de": 1
+    "next_de_ru": "2025-10-24T12:51:36.879660",
+    "next_ru_de": "2025-10-24T12:51:31.638145",
+    "interval_de_ru": 2,
+    "interval_ru_de": 2,
+    "correct_de_ru": 2,
+    "correct_ru_de": 2
   },
   {
     "de": "der Hund",
     "ru": "собака",
     "id": 2,
-    "next_de_ru": "2025-10-24T11:50:50.505195",
-    "next_ru_de": "2025-10-24T11:50:25.026295",
-    "interval_de_ru": 1,
-    "interval_ru_de": 1,
-    "correct_de_ru": 1,
-    "correct_ru_de": 1
+    "next_de_ru": "2025-10-24T12:51:18.512149",
+    "next_ru_de": "2025-10-24T12:51:40.376473",
+    "interval_de_ru": 2,
+    "interval_ru_de": 2,
+    "correct_de_ru": 2,
+    "correct_ru_de": 2
   },
   {
     "de": "singen",
     "ru": "петь",
     "id": 3,
-    "next_de_ru": "2025-10-24T11:50:29.396213",
-    "next_ru_de": "2025-10-24T11:50:57.278973",
-    "interval_de_ru": 1,
-    "interval_ru_de": 1,
-    "correct_de_ru": 1,
-    "correct_ru_de": 1
+    "next_de_ru": "2025-10-24T12:51:34.584518",
+    "next_ru_de": "2025-10-24T12:51:22.503204",
+    "interval_de_ru": 2,
+    "interval_ru_de": 2,
+    "correct_de_ru": 2,
+    "correct_ru_de": 2
   },
   {
     "de": "gehen",
     "ru": "идти",
     "id": 4,
-    "next_de_ru": "2025-10-24T11:50:41.736665",
-    "next_ru_de": "2025-10-24T11:50:46.738120",
+    "next_de_ru": "2025-10-24T12:01:53.952263",
+    "next_ru_de": "2025-10-24T12:01:47.285829",
     "interval_de_ru": 1,
     "interval_ru_de": 1,
-    "correct_de_ru": 1,
-    "correct_ru_de": 1
+    "correct_de_ru": 2,
+    "correct_ru_de": 2
   }
 ]
