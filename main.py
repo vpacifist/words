@@ -37,6 +37,8 @@ def add_word():
     new_word["interval_ru_de"] = 0
     new_word["correct_de_ru"] = 0
     new_word["correct_ru_de"] = 0
+    new_word["created_at"] = datetime.now().isoformat()
+    new_word["history"] = []
 
     data.append(new_word)
     save_data(data)
@@ -52,6 +54,11 @@ def save_result():
 
     for w in data:
         if w["id"] == word_id:
+            w.setdefault("history", []).append({
+                "date": datetime.now().date().isoformat(),
+                "correct": correct,
+                "reverse": reverse
+            })
             key = "correct_ru_de" if reverse else "correct_de_ru"
             w[key] += 1 if correct else 0
 

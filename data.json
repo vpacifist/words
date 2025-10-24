@@ -8,7 +8,9 @@
     "interval_de_ru": 0,
     "interval_ru_de": 0,
     "correct_de_ru": 0,
-    "correct_ru_de": 0
+    "correct_ru_de": 0,
+    "created_at": "2025-10-24T00:00:00",
+    "history": []
   },
   {
     "de": "der Hund",
@@ -19,7 +21,9 @@
     "interval_de_ru": 0,
     "interval_ru_de": 0,
     "correct_de_ru": 0,
-    "correct_ru_de": 0
+    "correct_ru_de": 0,
+    "created_at": "2025-10-24T00:00:00",
+    "history": []
   },
   {
     "de": "singen",
@@ -30,7 +34,9 @@
     "interval_de_ru": 1,
     "interval_ru_de": 0,
     "correct_de_ru": 1,
-    "correct_ru_de": 0
+    "correct_ru_de": 0,
+    "created_at": "2025-10-24T00:00:00",
+    "history": []
   },
   {
     "de": "gehen",
@@ -41,6 +47,21 @@
     "interval_de_ru": 0,
     "interval_ru_de": 0,
     "correct_de_ru": 0,
-    "correct_ru_de": 0
+    "correct_ru_de": 0,
+    "created_at": "2025-10-24T00:00:00",
+    "history": []
+  },
+  {
+    "de": "machen",
+    "ru": "делать",
+    "id": 5,
+    "next_de_ru": "2025-10-24T21:10:26.353615",
+    "next_ru_de": "2025-10-24T21:10:26.353632",
+    "interval_de_ru": 0,
+    "interval_ru_de": 0,
+    "correct_de_ru": 0,
+    "correct_ru_de": 0,
+    "created_at": "2025-10-24T21:10:26.353647",
+    "history": []
   }
 ]
