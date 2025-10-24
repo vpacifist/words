@@ -24,9 +24,6 @@
     <button type="submit">Добавить</button>
   </form>
 
-  <h1>Список слов</h1>
-  <ul id="wordList"></ul>
-
   <h1>Тренировка</h1>
   <div id="train">
     <p id="question">Нажми «Начать тренировку»</p>
@@ -84,17 +81,6 @@
           <td>${w.interval_ru_de} (${humanInterval(w.interval_ru_de)})</td>
         `;
         body.appendChild(row);
-      });
-      renderWordList();
-    }
-
-    function renderWordList(){
-      const ul = document.getElementById('wordList');
-      ul.innerHTML = '';
-      words.forEach(w => {
-        const li = document.createElement('li');
-        li.textContent = `${w.de} — ${w.ru}`;
-        ul.appendChild(li);
       });
     }
 
