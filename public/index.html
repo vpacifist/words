@@ -108,6 +108,7 @@
     const intElem = document.getElementById('interval');
 
     function pickWord(){
+      startBtn.style.display = "inline";
       const now = new Date();
       const cards = [];
       for (const w of words){
@@ -115,16 +116,25 @@
         if (new Date(w.next_ru_de) < now) cards.push({ w, reverse:true  }); // RU→DE
       }
 
-      if (!cards.length){
-        const nextTimes = words
-          .map(w => Math.min(new Date(w.next_de_ru), new Date(w.next_ru_de)))
-          .sort((a,b) => a - b);
+      if (!cards.length) {
+        const nextTimes = words.map(w => Math.min(new Date(w.next_de_ru), new Date(w.next_ru_de))).sort((a,b)=>a-b);
         const next = nextTimes[0];
-        const diffMin = Math.round((next - new Date()) / 60000);
-        const text = diffMin > 0 ? `Следующее слово через ${diffMin} мин.` : '';
-        q.textContent = `Все слова на паузе. ${text}`;
+        function updateTimer(){
+          const diff = Math.max(0, next - new Date());
+          const min = Math.floor(diff / 60000);
+          const sec = Math.floor((diff % 60000) / 1000);
+          q.textContent = `Все слова на паузе. Следующее слово через ${min} мин ${sec} сек.`;
+        }
+        updateTimer();
+        const t = setInterval(()=>{
+          updateTimer();
+          if (next <= new Date()){
+            clearInterval(t);
+            loadWords().then(()=>controller());
+          }
+        },1000);
         a.style.display = "none";
-        startBtn.textContent = "Начать тренировку";
+        startBtn.style.display = "none";
         return;
       }
 
@@ -209,6 +219,7 @@
 
     // первый рендер таблицы/списка
     updateTable();
+    loadWords().then(() => controller());
   </script>
 </body>
 </html>
