@@ -1,14 +1,20 @@
 # db.py
 import sqlite3, json
 from datetime import datetime, timedelta
+import hashlib
 
 DB_PATH = "words.db"
 
 def connect():
     return sqlite3.connect(DB_PATH)
 
+def hash_password(pw: str) -> str:
+    return hashlib.sha256(pw.encode("utf-8")).hexdigest()
+
 def init_db():
     with connect() as cx:
+
+        # таблица слов
         cx.execute("""
         CREATE TABLE IF NOT EXISTS words(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -26,6 +32,40 @@ def init_db():
         );
         """)
         cx.execute("CREATE INDEX IF NOT EXISTS idx_words_user ON words(user_id);")
+
+        # таблица пользователей
+        cx.execute("""
+        CREATE TABLE IF NOT EXISTS users(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          email TEXT UNIQUE NOT NULL,
+          password_hash TEXT NOT NULL,
+          created_at TEXT
+        );
+        """)
+
+def create_user(email: str, password: str):
+    with connect() as cx:
+        h = hash_password(password)
+        now = datetime.now().isoformat()
+        try:
+            cx.execute("INSERT INTO users (email, password_hash, created_at) VALUES (?,?,?)", (email, h, now))
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+def get_user_by_email(email: str):
+    with connect() as cx:
+        cur = cx.execute("SELECT id, email, password_hash, created_at FROM users WHERE email=?", (email,))
+        row = cur.fetchone()
+        if not row:
+            return None
+        return {"id": row[0], "email": row[1], "password_hash": row[2], "created_at": row[3]}
+
+def verify_user(email: str, password: str):
+    u = get_user_by_email(email)
+    if not u:
+        return False
+    return u["password_hash"] == hash_password(password)
 
 def row_to_dict(r):
     keys = ["id","user_id","de","ru","next_de_ru","next_ru_de",
