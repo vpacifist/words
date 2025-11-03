@@ -34,9 +34,10 @@ def add_word():
     data = load_data_uid(uid)
     new_word = request.get_json()
 
+    t = datetime.now() - timedelta(seconds=1)
     new_word["id"] = len(data) + 1
-    new_word["next_de_ru"] = datetime.now().isoformat()
-    new_word["next_ru_de"] = datetime.now().isoformat()
+    new_word["next_de_ru"] = t.isoformat()
+    new_word["next_ru_de"] = t.isoformat()
     new_word["interval_de_ru"] = 0
     new_word["interval_ru_de"] = 0
     new_word["correct_de_ru"] = 0

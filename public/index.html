@@ -124,6 +124,11 @@
       });
       f.reset();
       await updateTable();
+      await loadWords();
+      startBtn.textContent = 'Проверить';
+      feedback.textContent = '';
+      intElem.textContent = '';
+      pickWord();
     });
 
     // ---------- training ----------
