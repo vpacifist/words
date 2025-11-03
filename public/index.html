@@ -17,20 +17,23 @@
 </head>
 <body>
 
+  <h1>Вход / Регистрация</h1>
+  <div id="auth">
+    <input type="email" id="email" placeholder="Email" />
+    <input type="password" id="password" placeholder="Пароль" />
+    <button id="login">Войти</button>
+    <button id="register">Регистрация</button>
+    <p id="authStatus" style="font-weight:600;"></p>
+  </div>
+  <p id="loggedIn" style="display:none;">Вы вошли как <span id="userEmail"></span> <button id="logout">Выйти</button></p>
+  <hr/>
+
   <h1>Добавить слово</h1>
   <form id="addForm">
     <input type="text" name="de" placeholder="Немецкое слово" required />
     <input type="text" name="ru" placeholder="Перевод" required />
     <button type="submit">Добавить</button>
   </form>
-
-<p>
-  <label>
-    <input type="checkbox" id="fastMode">
-    Fast mode ×30
-  </label>
-</p>
-
 
   <h1>Тренировка</h1>
   <div id="train">
@@ -56,15 +59,90 @@
 
   <script>
 
-    let userId = localStorage.getItem('userId');
-    if (!userId) {
-      userId = crypto.randomUUID();
-      localStorage.setItem('userId', userId);
+    // ---------- auth ----------
+
+    async function safeFetch(url, options = {}) {
+      const r = await fetch(url, options);
+      if (r.status === 401) {
+        // авто-logout
+        await fetch('/api/logout');
+        document.getElementById('auth').style.display = 'block';
+        document.getElementById('loggedIn').style.display = 'none';
+        document.getElementById('authStatus').textContent = 'Сессия истекла, войдите снова.';
+        document.getElementById('authStatus').style.color = 'red';
+        // очистка интерфейса
+        document.getElementById('tableBody').innerHTML = '';
+        document.getElementById('question').textContent = 'Нажми «Начать тренировку»';
+        document.getElementById('interval').textContent = '';
+        document.getElementById('feedback').textContent = '';
+        words = [];
+        current = null;
+        clearInterval(pauseTimer);
+        throw new Error('401 Unauthorized');
+      }
+      return r;
     }
-    function withUser(url) {
-      const sep = url.includes('?') ? '&' : '?';
-      return `${url}${sep}user_id=${encodeURIComponent(userId)}`;
+
+    async function apiCall(url, body){
+      const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      return await r.json();
     }
+
+    document.getElementById('register').onclick = async ()=>{
+      const email=emailInput.value.trim(), password=pwInput.value.trim();
+      if (!email || !password) {
+        const msg = document.getElementById('authStatus');
+        msg.textContent = 'Введите email и пароль.';
+        msg.style.color = 'red';
+        return;
+      }
+      const d = await apiCall('/api/register',{email,password});
+      const msg = document.getElementById('authStatus');
+      if(d.status==='ok'){ msg.textContent='Регистрация успешна! Теперь войдите.'; msg.style.color='green'; }
+      else{ msg.textContent='Пользователь уже существует.'; msg.style.color='red'; }
+    };
+
+    document.getElementById('login').onclick = async ()=>{
+      const email=emailInput.value.trim(), password=pwInput.value.trim();
+      if (!email || !password) {
+        const msg = document.getElementById('authStatus');
+        msg.textContent = 'Введите email и пароль.';
+        msg.style.color = 'red';
+        return;
+      }
+      const d = await apiCall('/api/login',{email,password});
+      const msg = document.getElementById('authStatus');
+      if(d.status==='ok'){
+        msg.textContent='Вход выполнен'; msg.style.color='green';
+        document.getElementById('auth').style.display='none';
+        document.getElementById('loggedIn').style.display='block';
+        document.getElementById('userEmail').textContent=email;
+        updateTable();
+        startBtn.textContent = 'Начать тренировку';
+        q.textContent = 'Нажми «Начать тренировку»';
+        a.style.display = 'none';
+        feedback.textContent = '';
+        intElem.textContent = '';
+      } else { msg.textContent='Неверные данные.'; msg.style.color='red'; }
+    };
+
+    document.getElementById('logout').onclick = ()=>{
+      fetch('/api/logout');
+      document.getElementById('loggedIn').style.display='none';
+      document.getElementById('auth').style.display='block';
+      document.getElementById('authStatus').textContent='Вы вышли.';
+      // очистка интерфейса:
+      document.getElementById('tableBody').innerHTML = '';
+      document.getElementById('question').textContent = 'Нажми «Начать тренировку»';
+      document.getElementById('interval').textContent = '';
+      document.getElementById('feedback').textContent = '';
+      words = [];
+      current = null;
+      clearInterval(pauseTimer);
+    };
+    const emailInput=document.getElementById('email');
+    const pwInput=document.getElementById('password');
+
 
     // ---------- helpers ----------
     const DEBUG = true;
@@ -76,7 +154,7 @@
 
     function humanInterval(i){
       const h = intervalsHours[i] ?? 0;
-      const factor = isFast() ? 1/60 : 1;
+      const factor = 1;
       const adjH = h * factor;
       if (adjH < 1)  return `${Math.round(adjH*60)} мин`;
       if (adjH < 24) return `${adjH} ч`;
@@ -89,12 +167,12 @@
 
     // ---------- data fetchers ----------
     async function loadWords(){
-      const r = await fetch(withUser('/api/words'));
+      const r = await safeFetch('/api/words');
       words = await r.json();
     }
 
     async function updateTable(){
-      const r = await fetch(withUser('/api/words'));
+      const r = await safeFetch('/api/words');
       const data = await r.json();
       words = data; // синхронизируем кэш
       const body = document.getElementById('tableBody');
@@ -117,7 +195,7 @@
       const f = e.target;
       const body = { de: f.de.value.trim(), ru: f.ru.value.trim() };
       if (!body.de || !body.ru) return;
-      await fetch(withUser('/api/add_word'), {
+      await safeFetch('/api/add_word', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify(body)
@@ -210,7 +288,7 @@
 
       startBtn.disabled = true;
 
-      const resp = await fetch(withUser(`/api/result?fast=${isFast() ? 1 : 0}`), {
+      const resp = await safeFetch('/api/result?fast=0', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: current.id, correct, reverse })
@@ -264,24 +342,34 @@
     // ---------- reset ----------
     document.getElementById('reset').addEventListener('click', async ()=>{
       if (!confirm('Сбросить всю статистику?')) return;
-      await fetch(withUser('/api/reset'), { method: 'POST' });
+      await safeFetch('/api/reset', { method: 'POST' });
       feedback.textContent = '';
       intElem.textContent = '';
       await updateTable();
     });
 
-    // ---------- fast mode ----------
-    const fastBox = document.getElementById('fastMode');
-    fastBox.checked = localStorage.getItem('fastMode') === 'true';
-    fastBox.addEventListener('change', () => {
-      localStorage.setItem('fastMode', fastBox.checked);
-      log('Fast mode:', fastBox.checked);
-    });
-    function isFast(){ return fastBox.checked; }
+    // рендер таблицы
+    (async () => {
+      try {
+        const r = await safeFetch('/api/words');
+        if (r.ok) {
+          // пользователь залогинен — показываем всё
+          const d = await r.json();
+          words = d;
+          document.getElementById('auth').style.display = 'none';
+          document.getElementById('loggedIn').style.display = 'block';
+          document.getElementById('userEmail').textContent = d[0]?.user_id || '';
+          await updateTable();
+          controller();
+        }
+      } catch {
+        // не залогинен — показываем только форму
+        document.getElementById('auth').style.display = 'block';
+        document.getElementById('loggedIn').style.display = 'none';
+        document.getElementById('tableBody').innerHTML = '';
+      }
+    })();
 
-    // первый рендер таблицы/списка
-    updateTable();
-    loadWords().then(() => controller());
   </script>
 </body>
 </html>

@@ -26,19 +26,25 @@ def login():
 
 @app.route("/api/words")
 def get_words_api():
-    uid = session.get("user_id") or request.args.get("user_id", "public")
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"status": "error", "message": "not logged in"}), 401
     return jsonify(get_words(uid))
 
 @app.route("/api/add_word", methods=["POST"])
 def add_word_api():
-    uid = session.get("user_id") or request.args.get("user_id", "public")
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"status": "error", "message": "not logged in"}), 401
     body = request.get_json()
     w = add_word(uid, body["de"], body["ru"])
     return jsonify({"status": "ok", "added": w})
 
 @app.route("/api/result", methods=["POST"])
 def save_result_api():
-    uid = session.get("user_id") or request.args.get("user_id", "public")
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"status": "error", "message": "not logged in"}), 401
     data = request.get_json()
     w = update_result(uid, data["id"], data["correct"], data["reverse"], INTERVALS, fast=(request.args.get("fast")=="1"))
     if not w:
@@ -47,7 +53,9 @@ def save_result_api():
 
 @app.route("/api/reset", methods=["POST"])
 def reset_stats_api():
-    uid = session.get("user_id") or request.args.get("user_id", "public")
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"status": "error", "message": "not logged in"}), 401
     reset_user(uid)
     return jsonify({"status": "ok"})
 
