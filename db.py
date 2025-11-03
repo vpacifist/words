@@ -1,0 +1,114 @@
+# db.py
+import sqlite3, json
+from datetime import datetime, timedelta
+
+DB_PATH = "words.db"
+
+def connect():
+    return sqlite3.connect(DB_PATH)
+
+def init_db():
+    with connect() as cx:
+        cx.execute("""
+        CREATE TABLE IF NOT EXISTS words(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT NOT NULL,
+          de TEXT NOT NULL,
+          ru TEXT NOT NULL,
+          next_de_ru TEXT,
+          next_ru_de TEXT,
+          interval_de_ru INTEGER DEFAULT 0,
+          interval_ru_de INTEGER DEFAULT 0,
+          correct_de_ru INTEGER DEFAULT 0,
+          correct_ru_de INTEGER DEFAULT 0,
+          created_at TEXT,
+          history TEXT DEFAULT '[]'
+        );
+        """)
+        cx.execute("CREATE INDEX IF NOT EXISTS idx_words_user ON words(user_id);")
+
+def row_to_dict(r):
+    keys = ["id","user_id","de","ru","next_de_ru","next_ru_de",
+            "interval_de_ru","interval_ru_de","correct_de_ru","correct_ru_de",
+            "created_at","history"]
+    d = dict(zip(keys, r))
+    d["history"] = json.loads(d["history"] or "[]")
+    return d
+
+def get_words(user_id:str):
+    with connect() as cx:
+        cur = cx.execute("""SELECT id,user_id,de,ru,next_de_ru,next_ru_de,
+                                   interval_de_ru,interval_ru_de,correct_de_ru,correct_ru_de,
+                                   created_at,history
+                            FROM words WHERE user_id=? ORDER BY id""", (user_id,))
+        return [row_to_dict(r) for r in cur.fetchall()]
+
+def add_word(user_id:str, de:str, ru:str):
+    t = (datetime.now() - timedelta(seconds=1)).isoformat()
+    created = datetime.now().isoformat()
+    with connect() as cx:
+        cur = cx.execute("""INSERT INTO words
+            (user_id,de,ru,next_de_ru,next_ru_de,interval_de_ru,interval_ru_de,
+             correct_de_ru,correct_ru_de,created_at,history)
+            VALUES (?,?,?,?,?,0,0,0,0,?,?)""",
+            (user_id, de, ru, t, t, created, "[]"))
+        wid = cur.lastrowid
+        r = cx.execute("""SELECT id,user_id,de,ru,next_de_ru,next_ru_de,
+                                 interval_de_ru,interval_ru_de,correct_de_ru,correct_ru_de,
+                                 created_at,history
+                          FROM words WHERE id=? AND user_id=?""", (wid, user_id)).fetchone()
+        return row_to_dict(r)
+
+def update_result(user_id:str, word_id:int, correct:bool, reverse:bool, intervals, fast:bool):
+    with connect() as cx:
+        r = cx.execute("""SELECT id,user_id,de,ru,next_de_ru,next_ru_de,
+                                 interval_de_ru,interval_ru_de,correct_de_ru,correct_ru_de,
+                                 created_at,history
+                          FROM words WHERE id=? AND user_id=?""", (word_id, user_id)).fetchone()
+        if not r: return None
+        w = row_to_dict(r)
+
+        # history
+        w["history"].append({
+            "date": datetime.now().date().isoformat(),
+            "correct": bool(correct),
+            "reverse": bool(reverse)
+        })
+
+        key_int = "interval_ru_de" if reverse else "interval_de_ru"
+        key_next = "next_ru_de" if reverse else "next_de_ru"
+        key_corr = "correct_ru_de" if reverse else "correct_de_ru"
+
+        if correct:
+            w[key_int] = min((w[key_int] or 0) + 1, len(intervals) - 1)
+            w[key_corr] = (w[key_corr] or 0) + 1
+        else:
+            w[key_int] = 0
+
+        hours = intervals[w[key_int]]
+        if fast and hours:
+            hours = hours / 30.0
+        next_time = (datetime.now() + timedelta(hours=hours)).isoformat()
+        w[key_next] = next_time
+
+        cx.execute("""UPDATE words
+                      SET next_de_ru=?, next_ru_de=?,
+                          interval_de_ru=?, interval_ru_de=?,
+                          correct_de_ru=?, correct_ru_de=?,
+                          history=?
+                      WHERE id=? AND user_id=?""",
+                   (w["next_de_ru"], w["next_ru_de"],
+                    w["interval_de_ru"], w["interval_ru_de"],
+                    w["correct_de_ru"], w["correct_ru_de"],
+                    json.dumps(w["history"], ensure_ascii=False),
+                    word_id, user_id))
+        return w
+
+def reset_user(user_id:str):
+    now = datetime.now().isoformat()
+    with connect() as cx:
+        cx.execute("""UPDATE words
+                      SET interval_de_ru=0, interval_ru_de=0,
+                          correct_de_ru=0, correct_ru_de=0,
+                          next_de_ru=?, next_ru_de=? 
+                      WHERE user_id=?""", (now, now, user_id))
