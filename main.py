@@ -1,19 +1,21 @@
 from flask import Flask, jsonify, send_from_directory, request
 import json, os
 from datetime import datetime, timedelta
+import re
 
 DATA_FILE = "data.json"
+DATA_FILE_PREFIX = "data"
 INTERVALS = [0, 10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]
 
-def load_data():
-    if not os.path.exists(DATA_FILE):
-        return []
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_data(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+def sanitize_user_id(uid): 
+    return re.sub(r'[^A-Za-z0-9_-]','', uid or 'public') or 'public'
+def user_file(uid): 
+    return f"{DATA_FILE_PREFIX}_{sanitize_user_id(uid)}.json"
+def load_data_uid(uid):
+    fn=user_file(uid); 
+    return json.load(open(fn,encoding='utf-8')) if os.path.exists(fn) else []
+def save_data_uid(data,uid):
+    json.dump(data, open(user_file(uid),'w',encoding='utf-8'), ensure_ascii=False, indent=2)
 
 app = Flask(__name__, static_folder="public")
 
@@ -23,11 +25,13 @@ def home():
 
 @app.route("/api/words")
 def get_words():
-    return jsonify(load_data())
+    uid = request.args.get("user_id", "public")
+    return jsonify(load_data_uid(uid))
 
 @app.route("/api/add_word", methods=["POST"])
 def add_word():
-    data = load_data()
+    uid = request.args.get("user_id", "public")
+    data = load_data_uid(uid)
     new_word = request.get_json()
 
     new_word["id"] = len(data) + 1
@@ -41,12 +45,13 @@ def add_word():
     new_word["history"] = []
 
     data.append(new_word)
-    save_data(data)
+    save_data_uid(data, uid)
     return jsonify({"status": "ok", "added": new_word})
 
 @app.route("/api/result", methods=["POST"])
 def save_result():
-    data = load_data()
+    uid = request.args.get("user_id", "public")
+    data = load_data_uid(uid)
     result = request.get_json()
     word_id = result["id"]
     correct = result["correct"]
@@ -76,14 +81,15 @@ def save_result():
                 hours = hours / 30 if hours else 0
             w[key_next] = (datetime.now() + timedelta(hours=hours)).isoformat()
 
-            save_data(data)
+            save_data_uid(data, uid)
             return jsonify({"status": "ok", "updated": w})
 
     return jsonify({"status": "error", "message": "word not found"}), 404
 
 @app.route("/api/reset", methods=["POST"])
 def reset_stats():
-    data = load_data()
+    uid = request.args.get("user_id", "public")
+    data = load_data_uid(uid)
     for w in data:
         w["interval_de_ru"] = 0
         w["interval_ru_de"] = 0
@@ -91,7 +97,7 @@ def reset_stats():
         w["correct_ru_de"] = 0
         w["next_de_ru"] = datetime.now().isoformat()
         w["next_ru_de"] = datetime.now().isoformat()
-    save_data(data)
+    save_data_uid(data, uid)
     return jsonify({"status": "ok"})
 
 @app.route("/api/intervals")

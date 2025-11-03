@@ -55,6 +55,17 @@
   <p><button id="reset">Сбросить статистику</button></p>
 
   <script>
+
+    let userId = localStorage.getItem('userId');
+    if (!userId) {
+      userId = crypto.randomUUID();
+      localStorage.setItem('userId', userId);
+    }
+    function withUser(url) {
+      const sep = url.includes('?') ? '&' : '?';
+      return `${url}${sep}user_id=${encodeURIComponent(userId)}`;
+    }
+
     // ---------- helpers ----------
     const DEBUG = true;
     const log = (...a) => DEBUG && console.debug('[WORDS]', ...a);
@@ -78,12 +89,12 @@
 
     // ---------- data fetchers ----------
     async function loadWords(){
-      const r = await fetch('/api/words');
+      const r = await fetch(withUser('/api/words'));
       words = await r.json();
     }
 
     async function updateTable(){
-      const r = await fetch('/api/words');
+      const r = await fetch(withUser('/api/words'));
       const data = await r.json();
       words = data; // синхронизируем кэш
       const body = document.getElementById('tableBody');
@@ -106,7 +117,7 @@
       const f = e.target;
       const body = { de: f.de.value.trim(), ru: f.ru.value.trim() };
       if (!body.de || !body.ru) return;
-      await fetch('/api/add_word', {
+      await fetch(withUser('/api/add_word'), {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify(body)
@@ -194,11 +205,12 @@
 
       startBtn.disabled = true;
 
-      const resp = await fetch(`/api/result?fast=${isFast() ? 1 : 0}`, {
+      const resp = await fetch(withUser(`/api/result?fast=${isFast() ? 1 : 0}`), {
         method: 'POST',
-        headers: {'Content-Type':'application/json'},
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: current.id, correct, reverse })
       });
+
       const data = await resp.json();
       const w = data.updated;
 
@@ -247,7 +259,7 @@
     // ---------- reset ----------
     document.getElementById('reset').addEventListener('click', async ()=>{
       if (!confirm('Сбросить всю статистику?')) return;
-      await fetch('/api/reset', { method: 'POST' });
+      await fetch(withUser('/api/reset'), { method: 'POST' });
       feedback.textContent = '';
       intElem.textContent = '';
       await updateTable();
