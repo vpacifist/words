@@ -1,6 +1,6 @@
 # db.py
 import sqlite3, json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
 
 DB_PATH = "words.db"
@@ -46,7 +46,7 @@ def init_db():
 def create_user(email: str, password: str):
     with connect() as cx:
         h = hash_password(password)
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         try:
             cx.execute("INSERT INTO users (email, password_hash, created_at) VALUES (?,?,?)", (email, h, now))
             return True
@@ -84,8 +84,8 @@ def get_words(user_id:str):
         return [row_to_dict(r) for r in cur.fetchall()]
 
 def add_word(user_id:str, de:str, ru:str):
-    t = (datetime.now() - timedelta(seconds=1)).isoformat()
-    created = datetime.now().isoformat()
+    t = (datetime.now(timezone.utc) - timedelta(seconds=1)).isoformat()
+    created = datetime.now(timezone.utc).isoformat()
     with connect() as cx:
         cur = cx.execute("""INSERT INTO words
             (user_id,de,ru,next_de_ru,next_ru_de,interval_de_ru,interval_ru_de,
@@ -110,7 +110,7 @@ def update_result(user_id:str, word_id:int, correct:bool, reverse:bool, interval
 
         # history
         w["history"].append({
-            "date": datetime.now().date().isoformat(),
+            "date": datetime.now(timezone.utc).date().isoformat(),
             "correct": bool(correct),
             "reverse": bool(reverse)
         })
@@ -128,7 +128,7 @@ def update_result(user_id:str, word_id:int, correct:bool, reverse:bool, interval
         hours = intervals[w[key_int]]
         if fast and hours:
             hours = hours / 30.0
-        next_time = (datetime.now() + timedelta(hours=hours)).isoformat()
+        next_time = (datetime.now(timezone.utc) + timedelta(seconds=2, hours=hours)).isoformat()
         w[key_next] = next_time
 
         cx.execute("""UPDATE words
@@ -145,7 +145,7 @@ def update_result(user_id:str, word_id:int, correct:bool, reverse:bool, interval
         return w
 
 def reset_user(user_id:str):
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     with connect() as cx:
         cx.execute("""UPDATE words
                       SET interval_de_ru=0, interval_ru_de=0,
