@@ -62,7 +62,7 @@
     // ---------- auth ----------
 
     async function safeFetch(url, options = {}) {
-      const r = await fetch(url, options);
+      const r = await fetch(url, { ...options, credentials: 'include' });
       if (r.status === 401) {
         // авто-logout
         await fetch('/api/logout');
@@ -84,7 +84,12 @@
     }
 
     async function apiCall(url, body){
-      const r = await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      const r = await fetch(url,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        credentials:'include',
+        body:JSON.stringify(body)
+      });
       return await r.json();
     }
 

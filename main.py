@@ -64,6 +64,11 @@ def reset_stats_api():
 def get_intervals():
     return jsonify(INTERVALS)
 
+@app.route("/api/logout", methods=["POST", "GET"])
+def logout():
+    session.clear()
+    return jsonify({"status": "ok", "message": "logged out"})
+
 if __name__ == "__main__":
     init_db()
     app.run(host="0.0.0.0", port=8080)
