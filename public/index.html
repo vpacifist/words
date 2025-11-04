@@ -363,7 +363,11 @@
           words = d;
           document.getElementById('auth').style.display = 'none';
           document.getElementById('loggedIn').style.display = 'block';
-          document.getElementById('userEmail').textContent = d[0]?.user_id || '';
+          document.getElementById('userEmail').textContent = d.length ? d[0].user_id : '';
+          if (!d.length) {
+            document.getElementById('auth').style.display = 'block';
+            document.getElementById('loggedIn').style.display = 'none';
+          }
           await updateTable();
           controller();
         }
