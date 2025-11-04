@@ -5,6 +5,7 @@ import hashlib
 import os
 
 DB_PATH = os.environ.get("DB_PATH", os.path.join("data", "words.db"))
+os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
 def connect():
     return sqlite3.connect(DB_PATH)
