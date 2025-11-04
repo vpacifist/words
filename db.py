@@ -2,8 +2,9 @@
 import sqlite3, json
 from datetime import datetime, timedelta, timezone
 import hashlib
+import os
 
-DB_PATH = "words.db"
+DB_PATH = os.environ.get("DB_PATH", os.path.join("data", "words.db"))
 
 def connect():
     return sqlite3.connect(DB_PATH)
