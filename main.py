@@ -1,10 +1,11 @@
 from flask import Flask, jsonify, send_from_directory, request, session
 from db import init_db, get_words, add_word, update_result, reset_user, create_user, verify_user
+import os
 
 INTERVALS = [0, 10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]
 
 app = Flask(__name__, static_folder="public")
-app.secret_key = "supersecretkey"  # потом заменим на переменную окружения
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 
 @app.route("/")
 def home():
