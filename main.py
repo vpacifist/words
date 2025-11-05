@@ -5,7 +5,7 @@ import os
 INTERVALS = [0, 10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]
 
 app = Flask(__name__, static_folder="public")
-app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 
 @app.route("/")
 def home():
