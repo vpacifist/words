@@ -19,10 +19,12 @@
 
   <h1>Вход / Регистрация</h1>
   <div id="auth">
-    <input type="email" id="email" placeholder="Email" />
-    <input type="password" id="password" placeholder="Пароль" />
-    <button id="login">Войти</button>
-    <button id="register">Регистрация</button>
+    <form id="authForm" onsubmit="event.preventDefault(); document.getElementById('login').click();">
+      <input type="email" id="email" placeholder="Email" autocomplete="username" />
+      <input type="password" id="password" placeholder="Пароль" autocomplete="current-password" />
+      <button id="login" type="button">Войти</button>
+      <button id="register" type="button">Регистрация</button>
+    </form>
     <p id="authStatus" style="font-weight:600;"></p>
   </div>
   <p id="loggedIn" style="display:none;">Вы вошли как <span id="userEmail"></span> <button id="logout">Выйти</button></p>
@@ -59,28 +61,105 @@
 
   <script>
 
+    // --- persistent JWT using IndexedDB ---
+    const DB_NAME = 'wordsAuthDB', STORE_NAME = 'tokens';
+
+    function openDB() {
+      return new Promise((res, rej) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => req.result.createObjectStore(STORE_NAME);
+        req.onsuccess = () => res(req.result);
+        req.onerror = () => rej(req.error);
+      });
+    }
+
+    async function idbSet(key, val) {
+      try {
+        const db = await openDB();
+        return await new Promise((res, rej) => {
+          const tx = db.transaction(STORE_NAME, 'readwrite');
+          const store = tx.objectStore(STORE_NAME);
+          const req = store.put(val, key);
+        });
+      } catch(e) {
+        console.error('[idbSet] outer error', e);
+      }
+    }
+
+    async function idbGet(key) {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const req = tx.objectStore(STORE_NAME).get(key);
+        req.onsuccess = () => res(req.result);
+        req.onerror = () => rej(req.error);
+      });
+    }
+
+    async function idbDel(key) {
+      const db = await openDB();
+      return new Promise((res, rej) => {
+        const tx = db.transaction(STORE_NAME, 'readwrite');
+        const store = tx.objectStore(STORE_NAME);
+        store.delete(key);
+        tx.oncomplete = () => res();
+        tx.onerror = () => rej(tx.error);
+      });
+    }
+
+    const _ls = window.localStorage;
+    const _origSet = _ls.setItem.bind(_ls);
+    const _origGet = _ls.getItem.bind(_ls);
+    const _origRem = _ls.removeItem.bind(_ls);
+
+    // override localStorage for 'jwt'
+    localStorage.setItem = async (k,v)=>{
+      if (k==='jwt'){
+        try{ await idbSet(k,v); window._cachedJWT=v; } 
+        catch(e){ console.error('[idbSet]', e); }
+        return;
+      }
+      _origSet(k,v);
+    };
+    localStorage.getItem = async (k)=>{
+      if (k==='jwt') return window._cachedJWT ?? await idbGet(k) ?? null;
+      return _origGet(k);
+    };
+    localStorage.removeItem = (k)=>{
+      if (k==='jwt'){ window._cachedJWT=undefined; return idbDel(k); }
+      return _origRem(k);
+    };
+
     // ---------- auth ----------
 
-    async function safeFetch(url, options = {}) {
-      const r = await fetch(url, { ...options, credentials: 'include' });
-      if (r.status === 401) {
-        // авто-logout
-        await fetch('/api/logout');
-        document.getElementById('auth').style.display = 'block';
-        document.getElementById('loggedIn').style.display = 'none';
-        document.getElementById('authStatus').textContent = 'Сессия истекла, войдите снова.';
-        document.getElementById('authStatus').style.color = 'red';
-        // очистка интерфейса
-        document.getElementById('tableBody').innerHTML = '';
-        document.getElementById('question').textContent = 'Нажми «Начать тренировку»';
-        document.getElementById('interval').textContent = '';
-        document.getElementById('feedback').textContent = '';
-        words = [];
-        current = null;
-        clearInterval(pauseTimer);
-        throw new Error('401 Unauthorized');
+    async function safeFetch(url, options={}) {
+      try {
+        const token = await localStorage.getItem('jwt');
+        const headers = {'Content-Type': 'application/json', ...(options.headers || {})};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const r = await fetch(url, {...options, headers});
+        if (r.status === 401) {
+          // авто-logout
+          await fetch('/api/logout');
+          document.getElementById('auth').style.display = 'block';
+          document.getElementById('loggedIn').style.display = 'none';
+          document.getElementById('authStatus').textContent = 'Сессия истекла, войдите снова.';
+          document.getElementById('authStatus').style.color = 'red';
+          // очистка интерфейса
+          document.getElementById('tableBody').innerHTML = '';
+          document.getElementById('question').textContent = 'Нажми «Начать тренировку»';
+          document.getElementById('interval').textContent = '';
+          document.getElementById('feedback').textContent = '';
+          words = [];
+          current = null;
+          clearInterval(pauseTimer);
+          throw new Error('401 Unauthorized');
+        }
+        return r;
+      } catch (e) {
+        console.error('[safeFetch] error', e);
+        throw e;
       }
-      return r;
     }
 
     async function apiCall(url, body){
@@ -90,7 +169,13 @@
         credentials:'include',
         body:JSON.stringify(body)
       });
-      return await r.json();
+      const text = await r.text();
+      try {
+        const json = JSON.parse(text);
+        return json;
+      } catch(e) {
+        return {status:'error', message:'invalid JSON', raw:text};
+      }
     }
 
     document.getElementById('register').onclick = async ()=>{
@@ -119,11 +204,22 @@
       const msg = document.getElementById('authStatus');
       if(d.status==='ok'){
         msg.textContent='Вход выполнен'; msg.style.color='green';
-        localStorage.setItem('jwt', d.token);
+        await localStorage.setItem('jwt', d.token);
+        const resp = await safeFetch('/api/words');
+        try {
+          if (!resp.ok) {
+            msg.textContent='Ошибка сессии, попробуйте снова.'; msg.style.color='red';
+            return;
+          }
+          const data = await resp.json();
+          renderTable(data);
+        } catch(e) {
+          console.error('[login] error', e)
+        }
         document.getElementById('auth').style.display='none';
         document.getElementById('loggedIn').style.display='block';
         document.getElementById('userEmail').textContent=email;
-        updateTable();
+
         startBtn.textContent = 'Начать тренировку';
         q.textContent = 'Нажми «Начать тренировку»';
         a.style.display = 'none';
@@ -182,6 +278,22 @@
       const r = await safeFetch('/api/words');
       const data = await r.json();
       words = data; // синхронизируем кэш
+      const body = document.getElementById('tableBody');
+      body.innerHTML = '';
+      data.forEach(w => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${w.de}</td>
+          <td>${w.ru}</td>
+          <td>${w.interval_de_ru} (${humanInterval(w.interval_de_ru)})</td>
+          <td>${w.interval_ru_de} (${humanInterval(w.interval_ru_de)})</td>
+        `;
+        body.appendChild(row);
+      });
+    }
+
+    function renderTable(data){
+      words = data;
       const body = document.getElementById('tableBody');
       body.innerHTML = '';
       data.forEach(w => {
@@ -358,7 +470,7 @@
     // рендер таблицы
     (async () => {
       try {
-        const saved = localStorage.getItem('jwt');
+        const saved = await localStorage.getItem('jwt');
         if (saved) {
           const resp = await fetch('/api/refresh_token', {
             method: 'POST',
@@ -378,6 +490,7 @@
           // пользователь залогинен — показываем всё
           const d = await r.json();
           words = d;
+          renderTable(d)
           document.getElementById('auth').style.display = 'none';
           document.getElementById('loggedIn').style.display = 'block';
           document.getElementById('userEmail').textContent = d.length ? d[0].user_id : '';
@@ -385,8 +498,6 @@
             document.getElementById('auth').style.display = 'block';
             document.getElementById('loggedIn').style.display = 'none';
           }
-          await updateTable();
-          controller();
         }
       } catch {
         // не залогинен — показываем только форму
