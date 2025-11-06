@@ -119,6 +119,7 @@
       const msg = document.getElementById('authStatus');
       if(d.status==='ok'){
         msg.textContent='Вход выполнен'; msg.style.color='green';
+        localStorage.setItem('jwt', d.token);
         document.getElementById('auth').style.display='none';
         document.getElementById('loggedIn').style.display='block';
         document.getElementById('userEmail').textContent=email;
@@ -133,6 +134,7 @@
 
     document.getElementById('logout').onclick = ()=>{
       fetch('/api/logout');
+      localStorage.removeItem('jwt');
       document.getElementById('loggedIn').style.display='none';
       document.getElementById('auth').style.display='block';
       document.getElementById('authStatus').textContent='Вы вышли.';
@@ -356,6 +358,21 @@
     // рендер таблицы
     (async () => {
       try {
+        const saved = localStorage.getItem('jwt');
+        if (saved) {
+          const resp = await fetch('/api/refresh_token', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({token: saved})
+          });
+          const d = await resp.json();
+          if (d.status === 'ok') {
+            localStorage.setItem('jwt', d.token);
+            document.getElementById('auth').style.display = 'none';
+            document.getElementById('loggedIn').style.display = 'block';
+            document.getElementById('userEmail').textContent = 'auto-login';
+          }
+        }
         const r = await safeFetch('/api/words');
         if (r.ok) {
           // пользователь залогинен — показываем всё
