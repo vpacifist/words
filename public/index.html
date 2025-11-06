@@ -79,7 +79,9 @@
         return await new Promise((res, rej) => {
           const tx = db.transaction(STORE_NAME, 'readwrite');
           const store = tx.objectStore(STORE_NAME);
-          const req = store.put(val, key);
+          store.put(val, key);
+          tx.oncomplete = () => { db.close(); res(); };
+          tx.onerror = () => { db.close(); rej(tx.error); };
         });
       } catch(e) {
         console.error('[idbSet] outer error', e);
