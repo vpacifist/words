@@ -59,7 +59,33 @@
   </table>
   <p><button id="reset">Сбросить статистику</button></p>
 
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
   <script>
+
+    const socket = io();
+    let uiState = { version: 2, mode: "idle", timestamp: null };
+    let lastRender = 0;
+
+    function broadcastState(updates={}) {
+      uiState = { ...uiState, ...updates, timestamp: new Date().toISOString() };
+      socket.emit("client_state", uiState);
+    }
+
+    socket.on("state_sync", (msg) => {
+      if (msg.type === "data") {
+        words = msg.state.words || [];
+        renderTable(words);
+        return;
+      }
+      const state = msg.state;
+      if (state.version !== 2) { socket.emit("request_full_state"); return; }
+      const t = Date.parse(state.timestamp);
+      if (t <= lastRender) return;
+      lastRender = t;
+      if (state && state.mode) renderUI(state);
+    });
+
+    socket.on("connect", () => socket.emit("request_full_state"));
 
     // --- persistent JWT using IndexedDB ---
     const DB_NAME = 'wordsAuthDB', STORE_NAME = 'tokens';
@@ -252,7 +278,7 @@
     // ---------- helpers ----------
     const DEBUG = true;
     const log = (...a) => DEBUG && console.debug('[WORDS]', ...a);
-    let mode = 'idle'; // 'ask' | 'check' | 'next'
+    let mode = 'idle'; // 'idle' | 'ask' | 'check' | 'paused'
     let pauseTimer = null;
     let intervalsHours = [];
     fetch('/api/intervals').then(r=>r.json()).then(arr => intervalsHours = arr);
@@ -265,6 +291,26 @@
       if (adjH < 24) return `${adjH} ч`;
       return `${Math.round(adjH/24)} дн`;
     }
+
+    const UI_TEXT = {
+      paused: (timeLeft) =>
+        timeLeft ? `Все слова на паузе. Следующее слово через ${timeLeft}` : "Все слова на паузе…",
+
+      ask: {
+        text: (word, reverse) => `Переведи: ${reverse ? word.ru : word.de}`,
+        btn: "Проверить"
+      },
+
+      check: {
+        correct: "✅ Верно",
+        wrong: "❌ Ошибка",
+        nextBtn: "Следующее слово",
+        nextInfo: "Следующее слово готово.",
+        wordLabel: (w, reverse) => `Перевод слова: ${reverse ? w.ru : w.de}`
+      },
+
+      empty: "Добавь слова, чтобы начать тренировку."
+    };
 
     // ---------- state ----------
     let words = [];
@@ -283,29 +329,97 @@
       const body = document.getElementById('tableBody');
       body.innerHTML = '';
       data.forEach(w => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${w.de}</td>
-          <td>${w.ru}</td>
-          <td>${w.interval_de_ru} (${humanInterval(w.interval_de_ru)})</td>
-          <td>${w.interval_ru_de} (${humanInterval(w.interval_ru_de)})</td>
-        `;
+        const row = document.createElement("tr");
+
+        const c1 = document.createElement("td");
+        c1.textContent = w.de;
+
+        const c2 = document.createElement("td");
+        c2.textContent = w.ru;
+
+        const c3 = document.createElement("td");
+        c3.textContent = `${w.interval_de_ru} (${humanInterval(w.interval_de_ru)})`;
+
+        const c4 = document.createElement("td");
+        c4.textContent = `${w.interval_ru_de} (${humanInterval(w.interval_ru_de)})`;
+
+        row.append(c1, c2, c3, c4);
         body.appendChild(row);
       });
     }
 
-    function renderTable(data){
+    function renderUI(s) {
+      if (!s || !s.mode) return;
+      mode = s.mode;
+
+      // Сброс интерфейса перед применением нового состояния
+      q.textContent = "";
+      a.value = "";
+      feedback.textContent = "";
+      intElem.textContent = "";
+
+      if (!words.length) {
+        q.textContent = UI_TEXT.empty;
+        startBtn.style.display = "none";
+        return;
+      }
+      if (s.mode === "ask") {
+        const cur = words.find(w => w.id === s.currentId);
+        if (!cur) return;
+        q.textContent = UI_TEXT.ask.text(cur, s.reverse);
+        a.style.display = "inline";
+        startBtn.style.display = "inline";
+        startBtn.textContent = UI_TEXT.ask.btn;
+        startBtn.disabled = false;
+        a.focus();
+      } else if (s.mode === "check") {
+        const cur = words.find(w => w.id === s.currentId);
+        feedback.textContent = UI_TEXT.check[s.feedbackType];
+        if (cur) {
+          if (s.feedbackType === "correct") {
+            q.textContent = `${cur.de} → ${cur.ru}`;
+          } else if (s.feedbackType === "wrong" && s.lastAnswer) {
+            q.textContent = `${cur.de} → ${s.lastAnswer} ❌ (правильно: ${cur.ru})`;
+          } else {
+            q.textContent = UI_TEXT.check.wordLabel(cur, s.reverse);
+          }
+        }
+        startBtn.textContent = UI_TEXT.check.nextBtn;
+        startBtn.focus();
+        intElem.textContent = UI_TEXT.check.nextInfo;
+        a.style.display = "none";
+        startBtn.style.display = "inline";
+        startBtn.disabled = false;
+      } else if (s.mode === "paused") {
+        let timeLeft = "";
+        if (s.nextTime) {
+          const diff = new Date(s.nextTime) - new Date();
+          const m = Math.floor(diff / 60000),
+                sec = Math.floor((diff / 1000) % 60);
+          timeLeft = `${m} мин ${sec} сек.`;
+        }
+        q.textContent = UI_TEXT.paused(timeLeft);
+        startBtn.style.display = "none";
+        a.style.display = "none";
+        startBtn.disabled = true;
+      }
+    }
+
+    function renderTable(data) {
       words = data;
-      const body = document.getElementById('tableBody');
-      body.innerHTML = '';
+      const body = document.getElementById("tableBody");
+      body.innerHTML = "";
       data.forEach(w => {
-        const row = document.createElement('tr');
-        row.innerHTML = `
-          <td>${w.de}</td>
-          <td>${w.ru}</td>
-          <td>${w.interval_de_ru} (${humanInterval(w.interval_de_ru)})</td>
-          <td>${w.interval_ru_de} (${humanInterval(w.interval_ru_de)})</td>
-        `;
+        const row = document.createElement("tr");
+        const c1 = document.createElement("td");
+        c1.textContent = w.de;
+        const c2 = document.createElement("td");
+        c2.textContent = w.ru;
+        const c3 = document.createElement("td");
+        c3.textContent = `${w.interval_de_ru} (${humanInterval(w.interval_de_ru)})`;
+        const c4 = document.createElement("td");
+        c4.textContent = `${w.interval_ru_de} (${humanInterval(w.interval_ru_de)})`;
+        row.append(c1, c2, c3, c4);
         body.appendChild(row);
       });
     }
@@ -355,6 +469,10 @@
           .filter(t => t > new Date())
           .sort((a,b)=>a-b);
         const next = nextTimes[0];
+        const nextTime = next ? new Date(next).toISOString() : null;
+        mode = 'paused';
+        broadcastState({ mode, nextTime });
+        renderUI({ mode, nextTime });
         log('pick:pause', { hasNext: !!next, next });
         if (!next){
           q.textContent = "Все слова на паузе. Ожидание новых слов…";
@@ -388,12 +506,14 @@
       const pick = cards[Math.floor(Math.random()*cards.length)];
       current = pick.w;
       reverse = pick.reverse;
+      mode = 'ask';
       log('pick:show', { id: current.id, word: current.de, reverse });
 
-      q.textContent = reverse ? `Переведи: ${current.ru}` : `Переведи: ${current.de}`;
+      q.textContent = UI_TEXT.ask.text(current, reverse);
       a.style.display = "inline";
       a.value = "";
       a.focus();
+      broadcastState({ mode, currentId: current.id, reverse });
     }
 
     async function processAnswer(){
@@ -402,10 +522,8 @@
                               : user === current.ru.toLowerCase();
       log('answer', { id: current.id, reverse, user, correct });
 
-      feedback.textContent = correct
-        ? `✅ Верно: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`
-        : `❌ Ошибка: ${reverse ? current.ru : current.de} — ${reverse ? current.de : current.ru}`;
       feedback.style.color = correct ? 'green' : 'red';
+      mode = 'check';
 
       startBtn.disabled = true;
 
@@ -423,20 +541,26 @@
       const text = (h < 1) ? `${Math.round(h*60)} минут`
                  : (h < 24) ? `${h} часов`
                  : `${Math.round(h/24)} дней`;
-      intElem.textContent = `Следующая встреча этого слова через ${text}.`;
 
       await updateTable();
       log('answer:updated');
 
       startBtn.disabled = false;
-      startBtn.textContent = 'Следующее слово';
+      broadcastState({
+        mode: "check",
+        feedbackType: correct ? "correct" : "wrong",
+        nextText: `Следующая встреча этого слова через ${text}.`,
+        nextBtnText: startBtn.textContent,
+        currentId: current.id,
+        reverse
+      });
     }
 
     async function controller(){
       log('controller', { mode, btn: startBtn.textContent, words: words.length });
       if (!words.length) await loadWords();
 
-      if (startBtn.textContent === 'Начать тренировку' || startBtn.textContent === 'Следующее слово'){
+      if (mode === 'idle' || mode === 'check') {
         startBtn.textContent = 'Проверить';
         feedback.textContent = '';
         intElem.textContent = '';
@@ -444,10 +568,25 @@
         return;
       }
 
-      if (startBtn.textContent === 'Проверить'){
+      if (mode === 'ask') {
         await processAnswer();
         return;
       }
+
+      if (mode === 'next') {
+        pickWord();
+        if (current) {
+          broadcastState({
+            mode: "ask",
+            currentId: current.id,
+            reverse
+          });
+        } else {
+          broadcastState({ mode: "paused" });
+        }
+        return;
+      }
+
     }
 
     startBtn.addEventListener('click', controller);
@@ -467,6 +606,8 @@
       feedback.textContent = '';
       intElem.textContent = '';
       await updateTable();
+      mode = "idle";
+      pickWord();
     });
 
     // рендер таблицы

@@ -1,2 +1,4 @@
 flask
 PyJWT
+flask-socketio
+eventlet

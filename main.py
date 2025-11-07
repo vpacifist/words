@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, send_from_directory, request, session
+from flask_socketio import SocketIO, emit
 from db import init_db, get_words, add_word, update_result, reset_user, create_user, verify_user
 import os
 import jwt
@@ -7,9 +8,36 @@ from datetime import datetime, timedelta, timezone
 INTERVALS = [0, 10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]
 
 app = Flask(__name__, static_folder="public")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key")
 JWT_SECRET = os.environ.get("JWT_SECRET", "dev-jwt-key")
 JWT_EXPIRE_HOURS = 72
+
+@socketio.on("client_state")
+def handle_client_state(data):
+    required = {"mode", "timestamp", "version"}
+    if not all(k in data for k in required):
+        return
+    emit("state_sync", {"type": "client", "state": data}, broadcast=True)
+
+@socketio.on("request_full_state")
+def handle_request_full_state():
+    uid = session.get("user_id")
+    if uid:
+        data = get_user_state(uid)
+        # только данные, без ui-состояния
+        emit("state_sync", {"type": "data", "state": data})
+
+def get_user_state(uid):
+    from db import get_words
+    return {
+        "words": get_words(uid),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+def emit_state(uid):
+    state = get_user_state(uid)
+    socketio.emit("state_sync", {"type": "server", "state": state})
 
 @app.route("/")
 def home():
@@ -72,6 +100,7 @@ def add_word_api():
         return jsonify({"error": "invalid token"}), 401
     body = request.get_json()
     w = add_word(uid, body["de"], body["ru"])
+    emit_state(uid)
     return jsonify({"status": "ok", "added": w})
 
 @app.route("/api/result", methods=["POST"])
@@ -89,6 +118,7 @@ def save_result_api():
     w = update_result(uid, data["id"], data["correct"], data["reverse"], INTERVALS, fast=(request.args.get("fast")=="1"))
     if not w:
         return jsonify({"status": "error", "message": "word not found"}), 404
+    emit_state(uid)
     return jsonify({"status": "ok", "updated": w})
 
 @app.route("/api/reset", methods=["POST"])
@@ -103,6 +133,7 @@ def reset_stats_api():
     except Exception:
         return jsonify({"error": "invalid token"}), 401
     reset_user(uid)
+    emit_state(uid)
     return jsonify({"status": "ok"})
 
 @app.route("/api/intervals")
@@ -116,4 +147,4 @@ def logout():
 
 if __name__ == "__main__":
     init_db()
-    app.run(host="0.0.0.0", port=8080)
+    socketio.run(app, host="0.0.0.0", port=8080, debug=False)
