@@ -2,3 +2,5 @@ flask
 PyJWT
 flask-socketio
 eventlet
+gunicorn
+greenlet<3
