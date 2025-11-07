@@ -1,9 +1,12 @@
+import eventlet
+eventlet.monkey_patch()
 from flask import Flask, jsonify, send_from_directory, request, session
 from flask_socketio import SocketIO, emit
 from db import init_db, get_words, add_word, update_result, reset_user, create_user, verify_user
 import os
 import jwt
 from datetime import datetime, timedelta, timezone
+
 
 INTERVALS = [0, 10/60, 1, 12, 24, 72, 168, 336, 720, 2160, 4320, 8760, 17520]
 
@@ -147,4 +150,9 @@ def logout():
 
 if __name__ == "__main__":
     init_db()
-    socketio.run(app, host="0.0.0.0", port=8080, debug=False)
+    socketio.run(
+        app,
+        host="0.0.0.0",
+        port=8080,
+        debug=False,
+    )
