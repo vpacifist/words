@@ -150,10 +150,17 @@ def logout():
 
 if __name__ == "__main__":
     init_db()
-    if os.environ.get("RUN_MIGRATION_ON_START") == "True":
-        from db import connect
-        with connect() as cx:
+    # --- temporary migration route ---
+    @app.route("/migrate")
+    def migrate():
+        import sqlite3
+        try:
+            cx = sqlite3.connect("/data/words.db")
             cx.execute("ALTER TABLE words ADD COLUMN block_until_ru_de TEXT DEFAULT NULL;")
             cx.commit()
-            print("[DB] Manual migration applied")
+            cx.close()
+            return "Migration done!"
+        except Exception as e:
+            return f"Migration failed: {e}"
+    # --- end temporary migration route ---
     socketio.run(app, host="0.0.0.0", port=8080, debug=False, allow_unsafe_werkzeug=True)
