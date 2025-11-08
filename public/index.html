@@ -330,19 +330,18 @@
       body.innerHTML = '';
       data.forEach(w => {
         const row = document.createElement("tr");
-
         const c1 = document.createElement("td");
         c1.textContent = w.de;
-
         const c2 = document.createElement("td");
         c2.textContent = w.ru;
-
         const c3 = document.createElement("td");
         c3.textContent = `${w.interval_de_ru} (${humanInterval(w.interval_de_ru)})`;
-
         const c4 = document.createElement("td");
         c4.textContent = `${w.interval_ru_de} (${humanInterval(w.interval_ru_de)})`;
-
+        if (w.block_until_ru_de && new Date(w.block_until_ru_de) > new Date()) {
+          const left = Math.ceil((new Date(w.block_until_ru_de) - new Date()) / 60000);
+          c4.textContent += ` ⏸ ${left} мин`;
+        }
         row.append(c1, c2, c3, c4);
         body.appendChild(row);
       });
@@ -402,6 +401,16 @@
         startBtn.style.display = "none";
         a.style.display = "none";
         startBtn.disabled = true;
+        if (!pauseTimer && s.nextTime) {
+          function tick() {
+            const diff = new Date(s.nextTime) - new Date();
+            if (diff <= 0) { clearInterval(pauseTimer); pauseTimer = null; pickWord(); return; }
+            const m = Math.floor(diff/60000), sec = Math.floor(diff/1000)%60;
+            q.textContent = `Все слова на паузе. Следующее слово через ${m} мин ${sec} сек.`;
+          }
+          tick();
+          pauseTimer = setInterval(tick, 1000);
+        }
       }
     }
 
@@ -419,6 +428,10 @@
         c3.textContent = `${w.interval_de_ru} (${humanInterval(w.interval_de_ru)})`;
         const c4 = document.createElement("td");
         c4.textContent = `${w.interval_ru_de} (${humanInterval(w.interval_ru_de)})`;
+        if (w.block_until_ru_de && new Date(w.block_until_ru_de) > new Date()) {
+          const left = Math.ceil((new Date(w.block_until_ru_de) - new Date()) / 60000);
+          c4.textContent += ` ⏸ ${left} мин`;
+        }
         row.append(c1, c2, c3, c4);
         body.appendChild(row);
       });
@@ -458,8 +471,35 @@
       const now = new Date();
       const cards = [];
       for (const w of words){
-        if (new Date(w.next_de_ru) < now) cards.push({ w, reverse:false }); // DE→RU
-        if (new Date(w.next_ru_de) < now) cards.push({ w, reverse:true  }); // RU→DE
+        const now = new Date();
+        const deruReady = new Date(w.next_de_ru) < now;
+        const blockActive = w.block_until_ru_de && new Date(w.block_until_ru_de) > now;
+        const rudeReady = !blockActive && new Date(w.next_ru_de) < now;
+        if (deruReady) {                 // приоритет DE→RU
+          cards.push({ w, reverse:false });
+          continue;                      // не добавляем RU→DE для этого же слова
+        }
+        if (rudeReady) {
+          cards.push({ w, reverse:true });
+        }
+      }
+      // если все слова на паузе из-за блоков — найдём ближайшее окончание блока
+      if (cards.length === 0) {
+        const future = words
+          .flatMap(w => [w.next_de_ru, w.next_ru_de, w.block_until_ru_de])
+          .filter(Boolean)
+          .map(t => new Date(t))
+          .filter(d => d > now)
+          .sort((a, b) => a - b);
+        if (future.length) {
+          const next = future[0];
+          const nextTime = next.toISOString();
+          mode = 'paused';
+          broadcastState({ mode, nextTime });
+          renderUI({ mode, nextTime });
+          log('pick:pause:next', { next });
+          return;
+        }
       }
       log('pick:cards', cards.length);
 

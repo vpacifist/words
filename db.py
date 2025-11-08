@@ -15,6 +15,21 @@ def hash_password(pw: str) -> str:
 
 def init_db():
     with connect() as cx:
+        cur = cx.cursor()
+        cur.execute("PRAGMA table_info(words)")
+        cols = [r[1] for r in cur.fetchall()]
+        if "block_until_ru_de" not in cols:
+            cur.execute("ALTER TABLE words ADD COLUMN block_until_ru_de TEXT DEFAULT NULL")
+            cx.commit()
+            print("[DB] Added column block_until_ru_de]")
+
+        # заполняем новым полем для старых записей текущим временем (чтобы блок считался истёкшим)
+        cur.execute(
+            "UPDATE words SET block_until_ru_de=? WHERE block_until_ru_de IS NULL",
+            (datetime.now(timezone.utc).isoformat(),)
+        )
+        cx.commit()
+        print("[DB] Filled missing block_until_ru_de with current time")
 
         # таблица слов
         cx.execute("""
@@ -72,7 +87,7 @@ def verify_user(email: str, password: str):
 def row_to_dict(r):
     keys = ["id","user_id","de","ru","next_de_ru","next_ru_de",
             "interval_de_ru","interval_ru_de","correct_de_ru","correct_ru_de",
-            "created_at","history"]
+            "created_at","history", "block_until_ru_de"]
     d = dict(zip(keys, r))
     d["history"] = json.loads(d["history"] or "[]")
     return d
@@ -81,7 +96,7 @@ def get_words(user_id:str):
     with connect() as cx:
         cur = cx.execute("""SELECT id,user_id,de,ru,next_de_ru,next_ru_de,
                                    interval_de_ru,interval_ru_de,correct_de_ru,correct_ru_de,
-                                   created_at,history
+                                   created_at,history,block_until_ru_de
                             FROM words WHERE user_id=? ORDER BY id""", (user_id,))
         return [row_to_dict(r) for r in cur.fetchall()]
 
@@ -95,6 +110,8 @@ def add_word(user_id:str, de:str, ru:str):
             VALUES (?,?,?,?,?,0,0,0,0,?,?)""",
             (user_id, de, ru, t, t, created, "[]"))
         wid = cur.lastrowid
+        block_until = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
+        cx.execute("UPDATE words SET block_until_ru_de=? WHERE id=? AND user_id=?", (block_until, wid, user_id))
         r = cx.execute("""SELECT id,user_id,de,ru,next_de_ru,next_ru_de,
                                  interval_de_ru,interval_ru_de,correct_de_ru,correct_ru_de,
                                  created_at,history
@@ -133,6 +150,12 @@ def update_result(user_id:str, word_id:int, correct:bool, reverse:bool, interval
         next_time = (datetime.now(timezone.utc) + timedelta(seconds=2, hours=hours)).isoformat()
         w[key_next] = next_time
 
+        # блокировка DE→RU на 6 часов после успешного RU→DE
+        if correct and not reverse:
+            block_until = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
+            w["block_until_ru_de"] = block_until
+            cx.execute("UPDATE words SET block_until_ru_de=? WHERE id=? AND user_id=?", (block_until, word_id, user_id))
+
         cx.execute("""UPDATE words
                       SET next_de_ru=?, next_ru_de=?,
                           interval_de_ru=?, interval_ru_de=?,
@@ -152,5 +175,8 @@ def reset_user(user_id:str):
         cx.execute("""UPDATE words
                       SET interval_de_ru=0, interval_ru_de=0,
                           correct_de_ru=0, correct_ru_de=0,
-                          next_de_ru=?, next_ru_de=? 
+                          next_de_ru=?, next_ru_de=?,
+                          block_until_ru_de=NULL
                       WHERE user_id=?""", (now, now, user_id))
+        block_until = (datetime.now(timezone.utc) + timedelta(hours=6)).isoformat()
+        cx.execute("UPDATE words SET block_until_ru_de=? WHERE user_id=?", (block_until, user_id))
