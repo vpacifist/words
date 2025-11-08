@@ -148,19 +148,20 @@ def logout():
     session.clear()
     return jsonify({"status": "ok", "message": "logged out"})
 
+# --- temporary migration route ---
+@app.route("/migrate")
+def migrate():
+    import sqlite3
+    try:
+        cx = sqlite3.connect("/data/words.db")
+        cx.execute("ALTER TABLE words ADD COLUMN block_until_ru_de TEXT DEFAULT NULL;")
+        cx.commit()
+        cx.close()
+        return "Migration done!"
+    except Exception as e:
+        return f"Migration failed: {e}"
+# --- end temporary migration route ---
+
 if __name__ == "__main__":
     init_db()
-    # --- temporary migration route ---
-    @app.route("/migrate")
-    def migrate():
-        import sqlite3
-        try:
-            cx = sqlite3.connect("/data/words.db")
-            cx.execute("ALTER TABLE words ADD COLUMN block_until_ru_de TEXT DEFAULT NULL;")
-            cx.commit()
-            cx.close()
-            return "Migration done!"
-        except Exception as e:
-            return f"Migration failed: {e}"
-    # --- end temporary migration route ---
     socketio.run(app, host="0.0.0.0", port=8080, debug=False, allow_unsafe_werkzeug=True)
